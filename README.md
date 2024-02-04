@@ -14,7 +14,7 @@ This project focuses on classifying emotional states from physiological and grap
 
 - **Feature_Analysis.py**: A Python script for feature analysis, likely including data processing, analysis routines, and visualization functions to support emotion classification efforts.
 
-### Environment Setup
+### Environment SetupS
 
 To set up the Python environment necessary for running this project, please follow these steps:
 

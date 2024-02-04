@@ -14,7 +14,7 @@ This project focuses on classifying emotional states from physiological and grap
 
 - **Feature_Analysis.py**: A Python script for feature analysis, likely including data processing, analysis routines, and visualization functions to support emotion classification efforts.
 
-### Environment Setup
+### Environment SetupS
 
 To set up the Python environment necessary for running this project, please follow these steps:
 
@@ -66,3 +66,26 @@ We welcome contributions! If you have suggestions for improvements, please:
 ### License
 
 This project is released under the MIT License. By using or contributing to this project, you agree to abide by its terms.
+
+### Methodology Overview
+
+Our methodology leverages a novel Graph Signal Processing (GSP) approach to transform EDA signals into graphical representations, capturing the intricate dynamics of emotional states. We have quantized EDA signals into discrete levels, defining nodes and constructing edges through Euclidean distances. The extracted multi-scale EDA-graph features, encompassing graph-level, node-level, and edge-level characteristics, are pivotal for distinguishing various emotional states. Statistical analysis underscores the significance of these features, enhancing the precision of emotion classification.
+
+### Emotional State Detection Visualizations
+
+To visualize the emotional state detection process and results, refer to the figures included in our repository:
+
+![Emotional State Valence-Arousal](figures/Fig.1_discretization.jpg)
+*Figure 1: Discretization of emotional states in the valence-arousal plane.*
+
+![EDA Signal Processing Steps](figures/Fig.2_step_by_step_graph.jpg)
+*Figure 2: Step-by-step visualization of EDA signal processing into graph representations.*
+
+![Graphs for Amused vs. Relaxed States](figures/Fig.3_Graphs_representation.jpg)
+*Figure 3: Comparative EDA-graphs for 'Amused' and 'Relaxed' emotional states.*
+
+![Box Plots of Traditional EDA Features](figures/Fig.4_comparison_box_plots_traditionals_lab_features_reviewed_significants.jpg)
+*Figure 4: Box plot comparisons of traditional EDA features across different emotional states.*
+
+![Graph-Based Feature Comparison](figures/Fig.5_comparison_euclidean_8nn_box_plots_graphs_significants.jpg)
+*Figure 5: Comparison of significant graph-based EDA features for emotion classification.*

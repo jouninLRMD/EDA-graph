@@ -75,17 +75,20 @@ Our methodology leverages a novel Graph Signal Processing (GSP) approach to tran
 
 To visualize the emotional state detection process and results, refer to the figures included in our repository:
 
-![Emotional State Valence-Arousal](figures/Fig.1_discretization.jpg)
+![Emotional State Valence-Arousal](Paper_Figures/Fig_1_discretization.jpg)
 *Figure 1: Discretization of emotional states in the valence-arousal plane.*
 
-![EDA Signal Processing Steps](figures/Fig.2_step_by_step_graph.jpg)
+![EDA Signal Processing Steps](Paper_Figures/Fig_2_step_by_step_graph.jpg)
 *Figure 2: Step-by-step visualization of EDA signal processing into graph representations.*
 
-![Graphs for Amused vs. Relaxed States](figures/Fig.3_Graphs_representation.jpg)
+![Graphs for Amused vs. Relaxed States](Paper_Figures/Fig_3_Graphs_representation.jpg)
 *Figure 3: Comparative EDA-graphs for 'Amused' and 'Relaxed' emotional states.*
 
-![Box Plots of Traditional EDA Features](figures/Fig.4_comparison_box_plots_traditionals_lab_features_reviewed_significants.jpg)
-*Figure 4: Box plot comparisons of traditional EDA features across different emotional states.*
+![Selection of optimal Q](Paper_Figures/Fig_4_Selection_of_optimal_Q.jpg)
+*Figure 4: Selection of optimal Q.*
 
-![Graph-Based Feature Comparison](figures/Fig.5_comparison_euclidean_8nn_box_plots_graphs_significants.jpg)
-*Figure 5: Comparison of significant graph-based EDA features for emotion classification.*
+![Box Plots of Traditional EDA Features](Paper_Figures/Fig_5_comparison_box_plots_traditionals_lab_features_reviewed_significants.jpg)
+*Figure 5: Box plot comparisons of traditional EDA features across different emotional states.*
+
+![Graph-Based Feature Comparison](Paper_Figures/Fig_6_comparison_euclidean_8nn_box_plots_graphs_significants.jpg)
+*Figure 6: Comparison of significant graph-based EDA features for emotion classification.*

@@ -1,0 +1,13 @@
+numpy>=1.24
+scipy>=1.11
+pandas>=2.0
+scikit-learn>=1.2
+networkx>=3.0
+matplotlib>=3.7
+seaborn>=0.12
+joblib>=1.2
+PyYAML>=6.0
+statsmodels>=0.14
+scikit-posthocs>=0.8
+tqdm>=4.65
+neurokit2>=0.2.7

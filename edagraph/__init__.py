@@ -6,12 +6,14 @@ Mercado-Diaz, L. R., Veeranki, Y. R., Marmolejo-Ramos, F., & Posada-Quintero, H.
 EDA-Graph: Graph Signal Processing of Electrodermal Activity for Emotional States Detection.
 IEEE Journal of Biomedical and Health Informatics. https://doi.org/10.1109/JBHI.2024.3405975
 
-Public API
-----------
-``EDAGraphPipeline`` - high level end-to-end feature extractor.
-``build_eda_graph``  - convert an EDA segment into a ``networkx.Graph``.
-``extract_graph_features`` / ``extract_traditional_features`` - feature functions.
-``load_case_subject`` - CASE dataset loader.
+This package only contains the code required to
+1. turn an EDA segment into an EDA-graph (quantisation + k-NN) and
+2. extract the 58 graph / node / edge-level features described in Table II
+   of the paper.
+
+No classification, statistics or plotting utilities are provided here -
+those belong to the downstream analysis scripts used to produce the
+published results.
 """
 from .config import Config, CASE_CLASS_MAP, CASE_VIDEO_CLASSES
 from .preprocessing import preprocess_eda, segment_signal, label_window
@@ -21,12 +23,7 @@ from .quantization import (
     graph_nodes_from_quantization,
 )
 from .graph import build_eda_graph, knn_graph_from_points
-from .features import (
-    FEATURE_LEVELS,
-    GRAPH_FEATURE_NAMES,
-    extract_graph_features,
-    extract_traditional_features,
-)
+from .features import FEATURE_LEVELS, GRAPH_FEATURE_NAMES, extract_graph_features
 from .pipeline import EDAGraphPipeline
 from .dataset import load_case_subject, iter_case_windows
 
@@ -43,7 +40,6 @@ __all__ = [
     "build_eda_graph",
     "knn_graph_from_points",
     "extract_graph_features",
-    "extract_traditional_features",
     "FEATURE_LEVELS",
     "GRAPH_FEATURE_NAMES",
     "EDAGraphPipeline",

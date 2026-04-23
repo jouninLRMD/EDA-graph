@@ -301,7 +301,7 @@ pipeline runs in **~3–4 min on a laptop (8 cores)** versus roughly
 | Fig. 1 – class grid | `Paper_Figures/Fig_1_discretization.jpg` (static)           |
 | Fig. 2 – pipeline   | `edagraph.visualize.plot_eda_graph` on a sample window      |
 | Fig. 3 – A vs R     | idem, overlayed for Amused and Relaxed windows              |
-| Fig. 4 – optimal Q  | sweep `Config(q_step=Q)` for `Q in [0.01, 0.02, … 0.1]` + LOSO bal-acc|
+| Fig. 4 – optimal Q  | `python scripts/q_sweep.py --data-root CASE/interpolated --q-values 0.005,0.01,0.02,0.03,0.05,0.1,0.2,0.5` |
 | Fig. 5 – trad boxes | `scripts/run_statistics.py --features EDA_Traditional_Features.csv` |
 | Fig. 6 – graph boxes| `scripts/run_statistics.py --features EDA_graph_features.csv` |
 

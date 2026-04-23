@@ -279,8 +279,11 @@ def extract_graph_features(g: nx.Graph) -> Dict[str, float]:
     # ----- correlation between node index and degree (Spearman) ---------
     if n > 1:
         nodes = list(g.nodes())
-        rho, _ = spearmanr(nodes, [g.degree(v) for v in nodes])
-        out["spearmanr_correlation"] = _safe(rho)
+        degs = [g.degree(v) for v in nodes]
+        # spearmanr raises ConstantInputWarning for flat inputs - expected on tiny graphs.
+        if len(set(nodes)) > 1 and len(set(degs)) > 1:
+            rho, _ = spearmanr(nodes, degs)
+            out["spearmanr_correlation"] = _safe(rho)
 
     # ----- triangle / clustering statistics -----------------------------
     triangles = nx.triangles(g)
@@ -290,7 +293,10 @@ def extract_graph_features(g: nx.Graph) -> Dict[str, float]:
     out["transitivity"] = _safe(nx.transitivity(g))
     out["avg_clustering_coefficient"] = _safe(nx.average_clustering(g))
     if m >= 1:
-        out["assortativity"] = _safe(nx.degree_assortativity_coefficient(g))
+        # Assortativity is NaN when all nodes have the same degree; suppress the warning.
+        degs = [d for _, d in g.degree()]
+        if len(set(degs)) > 1:
+            out["assortativity"] = _safe(nx.degree_assortativity_coefficient(g))
 
     # ----- clique statistics -------------------------------------------
     try:

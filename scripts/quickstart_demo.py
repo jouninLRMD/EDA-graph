@@ -26,7 +26,7 @@ from edagraph import (
 from edagraph.visualize import plot_eda_graph
 
 
-def synthetic_eda(seed: int = 0, duration: float = 40.0, fs: int = 1000) -> np.ndarray:
+def synthetic_eda(seed: int = 0, duration: float = 90.0, fs: int = 1000) -> np.ndarray:
     rng = np.random.default_rng(seed)
     t = np.arange(int(duration * fs)) / fs
     scl = 5 + 0.3 * t / duration
@@ -62,8 +62,8 @@ def main() -> int:
     ax1.plot(t, window, "k")
     ax1.set_xlabel("time (s)")
     ax1.set_ylabel("EDA (normalised)")
-    ax1.set_title("Input window (20 s)")
-    plot_eda_graph(g, ax=ax2, title=f"EDA-graph (Q={cfg.q_levels}, k={cfg.knn_k})")
+    ax1.set_title(f"Input window ({cfg.window_sec:.0f} s)")
+    plot_eda_graph(g, ax=ax2, title=f"EDA-graph (Q={cfg.q_step} uS, k={cfg.knn_k})")
     fig.tight_layout()
     out = Path("quickstart_demo.png")
     fig.savefig(out, dpi=150)

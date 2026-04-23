@@ -102,49 +102,73 @@ between clips) are discarded automatically.
 
 ## 3. Methodology
 
-### 3.1 Signal preprocessing (`edagraph.preprocessing`)
+### 3.1 Signal preprocessing (`edagraph.preprocessing`) - Section II-B
 
-1. 4th-order zero-phase Butterworth **low-pass** at `lowpass_hz = 1.0 Hz`.
-2. Anti-alias **decimation** from `fs_raw = 1000 Hz` to `fs = 8 Hz`.
-3. Per-window **min–max normalisation** to `[0, 1]`.
-4. Non-overlapping **windowing** of `window_sec = 20 s`.
+Applied exactly in the order used in the paper:
 
-### 3.2 Graph construction (`edagraph.graph.build_eda_graph`)
+1. **Standard decimation** from `fs_raw = 1000 Hz` to `fs = 8 Hz`.
+2. **4th-order zero-phase Butterworth low-pass** at `lowpass_hz = 1 Hz`,
+   applied *after* decimation to eliminate high-frequency noise while
+   retaining tonic baseline shifts and phasic drivers below 1 Hz.
+3. **1-second median filter** (`median_filter_sec = 1.0`, i.e. 8 samples
+   at 8 Hz) to further smooth the signal.
+4. **Sliding windowing**: `window_sec = 60 s` with **50 % overlap**
+   (`window_step_sec = 30 s`). A window is retained only when at least
+   `majority_ratio = 0.8` of its samples share the same emotional
+   label; the others are discarded.
 
-Given a preprocessed and normalised window $x_t \in [0, 1]$, the
-amplitude axis is quantised into `Q = 10` discrete levels:
+### 3.2 Graph construction (`edagraph.graph.build_eda_graph`) - Section II-C
 
-$$ q_t = \operatorname{clip}(\lfloor x_t \cdot Q \rfloor, 0, Q-1). $$
+**Step 1 - Quantisation.** Each sample is rounded to the closest
+multiple of the quantisation step `Q` in microsiemens:
 
-Each *unique* level observed in the window becomes a **node** of the
-graph. The node coordinate is the pair
-`(mean_time_of_occurrence, level_value)`, both normalised to $[0,1]$, so
-that Euclidean distances between nodes are dimensionless.
+$$ x_{\text{quantized}} = Q \cdot \operatorname{round}\!\bigl(x_{\text{original}} / Q\bigr). $$
 
-Edges are created by connecting every node to its `K = 8` nearest
-neighbours using a `scipy.spatial.cKDTree` (complexity $O(N \log N)$).
-Edge weights are $w_{ij} = 1 / (1 + d_{ij})$.
+The paper reports `Q = 0.05 μS` as optimal after sweeping Q from 0.001
+to 0.99 μS - this is the default in `config.yaml`.
 
-### 3.3 Features (`edagraph.features`)
+**Step 2 - Node definition.** Nodes are the *unique* values of
+`x_quantized`, keeping only the first occurrence of each new value:
 
-**Graph features (59 columns, order matches `EDA_graph_features.csv`):**
+$$ X_{\text{nodes}} = x_{\text{quantized}}\bigl[x_{\text{quantized}} \ne x_{\text{quantized,shifted}}\bigr]. $$
 
-* Centralities (sum over nodes): degree, closeness, betweenness,
-  current-flow, log-flow, eigenvector, load, harmonic, PageRank,
-  HITS hubs.
-* Global statistics: number of nodes/edges, max/min/median degree,
-  transitivity, average clustering coefficient, assortativity,
-  triangle count & average triangle participation, graph clique
-  number, number of cliques, Spearman correlation (node id vs degree),
-  Weisfeiler-Lehman hash.
-* Principal-component (largest connected component) descriptors:
-  `P_is_chordal, P_center, P_diameter, P_periphery, P_radius,
-  P_average_clustering, P_closeness_centrality, eccentricity`.
-* Spectral descriptors: graph energy, standard deviation of the
-  adjacency/Laplacian spectrum, plus the 12 magnitude statistics
-  (mean / min / max / median / skewness / kurtosis) of the adjacency
-  and Laplacian spectra, and the same 12 statistics for the **phase**
-  of the complex spectrum → 36 spectral features.
+**Step 3 - Distance calculation.** The Euclidean distance between every
+pair of nodes (one-dimensional, `M = 1`):
+
+$$ D_{ij} = \sqrt{\sum_{k=1}^{M}\! (x_{ik} - x_{jk})^2} = |x_i - x_j|. $$
+
+**Step 4 - Nearest neighbours.** Each node is connected to its **`K = 8`**
+closest nodes, matched to the 8 Hz sampling rate. For other sampling
+rates (e.g. 10 Hz), `knn_k` should be set accordingly.
+
+**Step 5 - Adjacency.** Edge weight `w_ij = 1 / D_ij` (equation 5 of the
+paper). The adjacency matrix is symmetric, weighted, and has zeros on
+the diagonal.
+
+### 3.3 Features (`edagraph.features`) - Section II-D and Table II
+
+Features are grouped by level (see ``edagraph.features.FEATURE_LEVELS``):
+
+**Graph-level** (40) - Total Triangle Number, Graph Energy, Transitivity,
+Cliques Counts (`graph_clique_num`), Number of Cliques, Graph Is
+Chordal, Center (`P_center`), Diameter, Radius, Periphery, Average
+Clustering (both global and on the largest component), Weisfeiler-
+Lehman Kernel, Graph / Laplacian Spectrum Std, Avg Triangle
+Participation, and the 24 GS/LS Mean/Min/Max/Median/Skewness/Kurtosis
+of Magnitude *and* Phase.
+
+**Node-level** (14) - Total Degree / Closeness / Betweenness / Eigenvector
+/ Load / Harmonic Centrality, Total PageRank, Total Hubs, Number of
+Nodes, Maximum / Minimum / Median Degree, Closeness Centrality
+(`P_closeness_centrality`), Eccentricity.
+
+**Edge-level** (5) - Total Flow Centrality, Total Log Flow Centrality,
+Number of Edges, Assortativity, Spearman Correlation.
+
+The extracted dictionary uses the exact same column order as
+``EDA_graph_features.csv`` shipped with the paper (59 columns - the
+``avg_clustering_coefficient`` global + the ``P_`` version count as one
+feature family in Table II, giving the paper's total of 58).
 
 **Traditional features (4 columns):**
 
@@ -159,22 +183,27 @@ Phasic/tonic decomposition uses [NeuroKit2](https://neurokit2.readthedocs.io/)
 (`cvxEDA` method). A pure-SciPy fallback is used if NeuroKit2 is not
 installed.
 
-### 3.4 Classification (`edagraph.experiments`)
+### 3.4 Classification (`edagraph.experiments`) - Section II-F and Table IV
 
 * Leave-One-Subject-Out cross-validation via `GroupKFold`.
-* Seven classifiers with a 3-fold inner grid-search: Gaussian NB, k-NN,
-  Random Forest, AdaBoost, Gradient Boosting, Decision Tree, SVM.
+* **Eight classifiers** with an inner grid-search matching Table IV:
+  Gaussian NB, KNN, Random Forest, AdaBoost, Gradient Boosting,
+  Decision Tree, SVM (RBF), Bagging Ensemble.
 * Optional `SelectKBest(f_classif, k=K)` upstream (`--k-best 5` in the
-  paper).
+  paper) - ANOVA F-value feature ranking (Section II-G).
 * Metrics reported: accuracy, balanced accuracy, macro-F1, weighted-F1
-  and the full `classification_report`.
+  and the full `classification_report` (paper's primary metrics:
+  balanced accuracy and F1).
 
-### 3.5 Statistical analysis (`edagraph.stats`)
+### 3.5 Statistical analysis (`edagraph.stats`) - Section II-E
 
 * **Anderson-Darling** normality test per feature × class.
-* **Kruskal-Wallis** H-test across the five classes.
-* **Dunn** pair-wise post-hoc, Holm-corrected within feature, followed
-  by a global **Benjamini-Hochberg FDR** correction.
+* **Kruskal-Wallis** one-way ANOVA on ranks; features with
+  `p < 0.05` advance to post-hoc.
+* **Dunn** pair-wise post-hoc with **Holm-Bonferroni** correction.
+  The paper's adjusted significance threshold is ``alpha = 0.005``;
+  a Benjamini-Hochberg FDR correction can additionally be enabled via
+  ``--apply-fdr`` if desired.
 
 ---
 
@@ -216,15 +245,15 @@ eda-graph/
 ```python
 from edagraph import Config, EDAGraphPipeline, build_eda_graph, extract_graph_features
 
-# End-to-end for a full dataset
-cfg = Config(q_levels=10, knn_k=8, window_sec=20)
+# End-to-end for a full dataset (paper defaults: 60 s windows @ 50 % overlap, Q = 0.05 uS, K = 8)
+cfg = Config()
 pipe = EDAGraphPipeline(cfg=cfg, n_jobs=-1)
 df = pipe.extract_all("CASE/interpolated")          # joblib-parallel over subjects
 df.to_csv("EDA_graph_features.csv", index=False)
 
-# Or on a single window of your own EDA signal
+# Or on a single 60 s window of your own EDA signal
 import numpy as np
-window = np.load("my_eda_20s.npy")                  # 160 samples @ 8 Hz
+window = np.load("my_eda_60s.npy")                  # 480 samples @ 8 Hz
 graph = build_eda_graph(window, cfg)
 features = extract_graph_features(graph)
 ```
@@ -245,17 +274,17 @@ print(summary)
 
 ## 6. Performance
 
-Single-core, 20 s windows sampled at 8 Hz (`Q = 10`, `K = 8`):
+Single-core, 60 s windows sampled at 8 Hz (`Q = 0.05 μS`, `K = 8`):
 
-| Stage                              | Time per window |
-|------------------------------------|-----------------|
-| Butterworth + decimation           | ~0.05 ms        |
-| Quantisation + k-NN graph (cKDTree)| ~0.3 ms         |
-| 59 graph features                  | ~11 ms          |
-| **Total (single window)**          | **~12 ms**      |
+| Stage                                   | Time per window |
+|-----------------------------------------|-----------------|
+| Decimation + low-pass + median filter   | ~0.1 ms         |
+| Quantisation + k-NN graph (cKDTree)     | ~0.3 ms         |
+| 58 graph features                       | ~12 ms          |
+| **Total (single window)**               | **~13 ms**      |
 
-For the full CASE dataset (~16 500 windows across 30 subjects) the
-pipeline runs in **~3 min on a laptop (8 cores)** versus roughly
+For the full CASE dataset (~16 447 windows across 30 subjects) the
+pipeline runs in **~3–4 min on a laptop (8 cores)** versus roughly
 **~2 hours** for the original un-optimised code. Speed-ups come from
 
 * vectorised preprocessing (`scipy.signal.filtfilt` + `decimate`),
@@ -272,7 +301,7 @@ pipeline runs in **~3 min on a laptop (8 cores)** versus roughly
 | Fig. 1 – class grid | `Paper_Figures/Fig_1_discretization.jpg` (static)           |
 | Fig. 2 – pipeline   | `edagraph.visualize.plot_eda_graph` on a sample window      |
 | Fig. 3 – A vs R     | idem, overlayed for Amused and Relaxed windows              |
-| Fig. 4 – optimal Q  | sweep `Config(q_levels=Q)` for `Q in [4..20]` + LOSO bal-acc|
+| Fig. 4 – optimal Q  | sweep `Config(q_step=Q)` for `Q in [0.01, 0.02, … 0.1]` + LOSO bal-acc|
 | Fig. 5 – trad boxes | `scripts/run_statistics.py --features EDA_Traditional_Features.csv` |
 | Fig. 6 – graph boxes| `scripts/run_statistics.py --features EDA_graph_features.csv` |
 

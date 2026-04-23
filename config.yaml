@@ -1,17 +1,21 @@
 # Default parameters for the EDA-Graph pipeline.
+# Values follow Section II of the EDA-Graph paper (IEEE JBHI, 2024).
 # Copy and edit if you want to override the defaults.
 
 # Acquisition / preprocessing
 fs_raw: 1000              # raw sampling rate of the CASE dataset (Hz)
 fs: 8                     # target sampling rate after decimation (Hz)
-lowpass_hz: 1.0           # cutoff of the 4th-order Butterworth low-pass filter (Hz)
-window_sec: 20.0          # length of each analysis window (s)
-window_step_sec: 20.0     # step between consecutive windows (s)
+lowpass_hz: 1.0           # 4th-order Butterworth low-pass applied AFTER decimation (Hz)
+median_filter_sec: 1.0    # median filter kernel length in seconds (=8 samples at 8 Hz)
+
+# Windowing
+window_sec: 60.0          # length of each analysis window (s)
+window_step_sec: 30.0     # 50 % overlap
+majority_ratio: 0.8       # min fraction of samples with same label to keep a window
 
 # Graph construction
-q_levels: 10              # number of amplitude quantisation levels Q
+q_step: 0.05              # amplitude quantisation step in microsiemens
 knn_k: 8                  # number of nearest neighbours per node
-normalize: "minmax"       # "minmax" or "zscore"
 
 # Misc
 random_state: 42

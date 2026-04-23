@@ -117,7 +117,13 @@ def iter_case_windows(
     vid_grid = _resample_to_grid(ann["time"].to_numpy(), ann["video"].to_numpy(), t_grid, kind="nearest")
 
     for start, end, window in segment_signal(eda, cfg):
-        cls, v, a = label_window(vid_grid[start:end], val_grid[start:end], aro_grid[start:end], cfg.class_map)
+        cls, v, a = label_window(
+            vid_grid[start:end],
+            val_grid[start:end],
+            aro_grid[start:end],
+            cfg.class_map,
+            majority_ratio=cfg.majority_ratio,
+        )
         if cls is None:
             continue
         yield cls, v, a, window, val_grid[start:end], aro_grid[start:end]

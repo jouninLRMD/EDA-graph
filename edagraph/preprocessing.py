@@ -1,23 +1,23 @@
 """Preprocessing of raw EDA signals prior to graph construction.
 
-The pipeline followed in the paper is:
+Matches Section II-B of the paper:
 
-1. 4th-order zero-phase low-pass Butterworth (``lowpass_hz``).
-2. Anti-alias filter + decimation to ``fs``.
-3. Per-subject min-max (or z-score) normalisation to stabilise amplitude
-   ranges across participants.
-4. Sliding window segmentation (``window_sec`` s, non-overlapping by
-   default).
-
-Implemented vectorised with SciPy so that a whole session (~3 min * 8 videos)
-can be filtered in a few milliseconds.
+1. Standard decimation from ``fs_raw`` (1 kHz) to ``fs`` (8 Hz).
+2. 4th-order zero-phase Butterworth **low-pass** at ``lowpass_hz``
+   (1 Hz) applied *after* decimation, to keep tonic baseline shifts and
+   phasic drivers below that threshold.
+3. 1-second (8-sample) **median filter** to further smooth the signal.
+4. Sliding window segmentation: ``window_sec = 60 s`` with 50 % overlap.
+5. Majority-label windowing: a window is kept only if at least
+   ``majority_ratio`` (80 %) of its samples share the same emotional
+   label (based on the CASE video id).
 """
 from __future__ import annotations
 
-from typing import Iterable, Iterator, Tuple
+from typing import Iterator, Tuple
 
 import numpy as np
-from scipy.signal import butter, decimate, filtfilt
+from scipy.signal import butter, decimate, filtfilt, medfilt
 
 from .config import Config
 
@@ -27,19 +27,14 @@ from .config import Config
 # ---------------------------------------------------------------------------
 
 def _butter_lowpass(signal: np.ndarray, fs: float, cutoff: float, order: int = 4) -> np.ndarray:
-    """Zero-phase Butterworth low-pass filter.
-
-    Using ``filtfilt`` removes phase distortion, which is important because the
-    quantisation step maps amplitude to node identity - any phase shift would
-    move events relative to the label stream.
-    """
+    """Zero-phase Butterworth low-pass (``filtfilt``)."""
     nyq = 0.5 * fs
     b, a = butter(order, cutoff / nyq, btype="low")
     return filtfilt(b, a, signal)
 
 
 def preprocess_eda(raw: np.ndarray, cfg: Config) -> np.ndarray:
-    """Filter and decimate a raw EDA trace.
+    """Decimate -> low-pass -> median filter.
 
     Parameters
     ----------
@@ -51,40 +46,47 @@ def preprocess_eda(raw: np.ndarray, cfg: Config) -> np.ndarray:
     Returns
     -------
     (M,) array
-        Low-pass filtered signal sampled at ``cfg.fs`` Hz.
+        Preprocessed signal sampled at ``cfg.fs`` Hz.
     """
     raw = np.asarray(raw, dtype=np.float64).ravel()
     if raw.size == 0:
         return raw
-    filtered = _butter_lowpass(raw, cfg.fs_raw, cfg.lowpass_hz)
+
+    # 1. Decimation 1000 Hz -> 8 Hz.
     factor = int(round(cfg.fs_raw / cfg.fs))
-    if factor <= 1:
-        return filtered
-    # ``decimate`` already applies an 8th-order Chebyshev anti-alias filter.
-    return decimate(filtered, factor, ftype="iir", zero_phase=True)
+    if factor > 1:
+        # ``decimate`` applies an 8th-order Chebyshev anti-alias filter.
+        signal = decimate(raw, factor, ftype="iir", zero_phase=True)
+    else:
+        signal = raw.copy()
+
+    # 2. 4th-order Butterworth low-pass at lowpass_hz (after decimation).
+    if cfg.lowpass_hz and cfg.lowpass_hz < cfg.fs / 2:
+        signal = _butter_lowpass(signal, cfg.fs, cfg.lowpass_hz)
+
+    # 3. 1-second median filter (8 samples at 8 Hz).
+    k = cfg.median_filter_samples
+    if k and k >= 3:
+        signal = medfilt(signal, kernel_size=k)
+
+    return signal
 
 
 # ---------------------------------------------------------------------------
 # Windowing
 # ---------------------------------------------------------------------------
 
-def segment_signal(
-    signal: np.ndarray, cfg: Config, start_times: np.ndarray | None = None
-) -> Iterator[Tuple[int, int, np.ndarray]]:
-    """Iterate over fixed-length windows.
+def segment_signal(signal: np.ndarray, cfg: Config) -> Iterator[Tuple[int, int, np.ndarray]]:
+    """Iterate over ``(start_idx, end_idx, window)`` tuples.
 
-    Yields ``(start_idx, end_idx, window)`` triples. ``start_idx`` and
-    ``end_idx`` are indices into ``signal`` at sampling rate ``cfg.fs``.
-
-    If a ``start_times`` array is provided, it is returned as the third
-    element instead of integer indices - useful when aligning with the
-    annotation stream.
+    Uses fixed-length windows of ``cfg.window_sec`` with a step of
+    ``cfg.window_step_sec`` (50 % overlap by default).
     """
     n = signal.size
     w = cfg.window_samples
     step = cfg.step_samples
-    if w <= 0:
-        raise ValueError("window_sec must be positive")
+    if w <= 0 or step <= 0:
+        raise ValueError("window_sec and window_step_sec must be positive")
 
     for start in range(0, n - w + 1, step):
         end = start + w
@@ -100,21 +102,23 @@ def label_window(
     valence: np.ndarray,
     arousal: np.ndarray,
     class_map: dict,
+    majority_ratio: float = 0.8,
 ) -> Tuple[int | None, float, float]:
-    """Compute the categorical class + mean valence / arousal of a window.
+    """Compute the majority class + mean valence / arousal of a window.
 
-    A window is labelled with the majority video-id present. If that id is
-    not in ``class_map`` the window is skipped (returns ``None`` for the
-    class), which typically filters out transitions between clips.
+    A window is retained only if at least ``majority_ratio`` of the samples
+    share the same video id **and** that id is in ``class_map``. Otherwise
+    the returned class is ``None`` (the window is dropped).
     """
-    vid = video_id_series.astype(int)
+    vid = video_id_series.astype(int).ravel()
     if vid.size == 0:
         return None, float("nan"), float("nan")
-    # Majority video id.
-    counts = np.bincount(vid - vid.min()) if vid.min() >= 0 else np.bincount(vid)
-    majority_id = int(np.argmax(counts) + (vid.min() if vid.min() >= 0 else 0))
-    cls = class_map.get(majority_id)
-    # If the window straddles a transition (majority < 80 %) drop it.
-    if counts.max() / counts.sum() < 0.8:
-        cls = None
-    return cls, float(np.mean(valence)), float(np.mean(arousal))
+
+    uniq, counts = np.unique(vid, return_counts=True)
+    majority_idx = int(np.argmax(counts))
+    majority_id = int(uniq[majority_idx])
+    fraction = counts[majority_idx] / counts.sum()
+
+    if fraction < majority_ratio or majority_id not in class_map:
+        return None, float(np.mean(valence)), float(np.mean(arousal))
+    return class_map[majority_id], float(np.mean(valence)), float(np.mean(arousal))

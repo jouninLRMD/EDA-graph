@@ -1,15 +1,19 @@
 """Graph construction utilities.
 
-The core building block is :func:`build_eda_graph` which takes a raw EDA
-window and returns a :class:`networkx.Graph`.
+Implements Steps 3-5 of Section II-C of the paper:
 
-The implementation uses :class:`scipy.spatial.cKDTree` for the :math:`k`-NN
-search (``O(N log N)``) and builds the graph from numpy arrays, which is an
-order of magnitude faster than iterating node by node in pure Python.
+* Step 3 - Distance calculation: the pair-wise Euclidean distance between
+  node values (``M = 1`` in the paper, so it reduces to
+  :math:`D_{ij} = |x_i - x_j|`).
+* Step 4 - Nearest neighbours: each node is connected to its 8 closest
+  neighbours by ``D_{ij}``.
+* Step 5 - Adjacency matrix: edge weights are :math:`w_{ij} = 1/D_{ij}`;
+  ``A`` is the symmetric weighted adjacency.
+
+Uses :class:`scipy.spatial.cKDTree` for the :math:`k`-NN search, so the
+whole step is ``O(N log N)``.
 """
 from __future__ import annotations
-
-from typing import Iterable
 
 import networkx as nx
 import numpy as np
@@ -20,10 +24,22 @@ from .quantization import graph_nodes_from_quantization, quantize_signal
 
 
 def knn_graph_from_points(points: np.ndarray, k: int) -> nx.Graph:
-    """Return an undirected :math:`k`-NN graph over a 2-D point cloud.
+    """Build an undirected :math:`k`-NN graph.
 
-    Edge weights are ``1 / (1 + distance)`` so that closer nodes have
-    higher weights - the form used by the paper.
+    Parameters
+    ----------
+    points : (N, M) array
+        Node feature vectors. ``M = 1`` for the EDA-graph case.
+    k : int
+        Number of neighbours per node.
+
+    Notes
+    -----
+    Edge weight follows equation (5) of the paper: ``w_st = 1 / D_st``.
+    A small epsilon is added to the denominator to avoid division by zero
+    when two nodes sit on top of each other (which should not happen for
+    the EDA-graph, since the node-definition step removes duplicate
+    values, but keeps the function robust for generic inputs).
     """
     n = points.shape[0]
     g = nx.Graph()
@@ -40,11 +56,11 @@ def knn_graph_from_points(points: np.ndarray, k: int) -> nx.Graph:
     dst = idx[:, 1:].ravel()
     d = dist[:, 1:].ravel()
 
-    # Deduplicate undirected edges by sorting endpoints.
+    # Deduplicate undirected edges.
     a = np.minimum(src, dst)
     b = np.maximum(src, dst)
     pair = np.unique(np.stack([a, b, d], axis=1), axis=0)
-    weights = 1.0 / (1.0 + pair[:, 2])
+    weights = 1.0 / np.maximum(pair[:, 2], 1e-12)
     g.add_weighted_edges_from(
         ((int(u), int(v), float(w)) for u, v, w in zip(pair[:, 0], pair[:, 1], weights)),
         weight="weight",
@@ -55,19 +71,21 @@ def knn_graph_from_points(points: np.ndarray, k: int) -> nx.Graph:
 def build_eda_graph(window: np.ndarray, cfg: Config) -> nx.Graph:
     """Convert a single EDA window to an ``nx.Graph``.
 
-    Nodes are unique quantised amplitude levels observed in the window.
-    Edges connect each node to its :math:`k` nearest neighbours in
-    ``(time, level)`` space, using Euclidean distance. Node attributes
-    ``level`` and ``time`` and edge attribute ``weight`` are stored.
+    Nodes are the unique quantised amplitude values in the window.
+    Edges connect each node to its :math:`k = \\text{cfg.knn\\_k}`
+    nearest neighbours using the Euclidean distance
+    :math:`D_{ij} = |x_i - x_j|`.
+
+    The returned graph uses the original quantised value as node id, and
+    stores it both as an attribute and as the node label for convenience.
     """
     q = quantize_signal(window, cfg)
-    levels, coords = graph_nodes_from_quantization(q, cfg)
-    g = knn_graph_from_points(coords, cfg.knn_k)
+    values, points = graph_nodes_from_quantization(q, cfg)
+    g = knn_graph_from_points(points, cfg.knn_k)
 
-    # Relabel nodes with their quantisation level and attach coordinates.
-    mapping = {i: int(levels[i]) for i in range(levels.size)}
+    # Relabel integer indices with the actual quantised values.
+    mapping = {i: float(values[i]) for i in range(values.size)}
     g = nx.relabel_nodes(g, mapping, copy=True)
-    for i, lvl in enumerate(levels):
-        g.nodes[int(lvl)]["level"] = int(lvl)
-        g.nodes[int(lvl)]["time"] = float(coords[i, 0])
+    for v in values:
+        g.nodes[float(v)]["value"] = float(v)
     return g

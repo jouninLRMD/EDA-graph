@@ -12,14 +12,23 @@ from .config import CASE_CLASS_MAP
 
 
 def plot_eda_graph(graph: nx.Graph, ax=None, title: str = "EDA-graph"):
+    """Render an EDA-graph laid out by node value.
+
+    Nodes are 1-D (they carry a single quantised amplitude). To obtain a
+    readable 2-D layout we use a spring layout initialised from the node
+    values on the y-axis.
+    """
     ax = ax or plt.gca()
-    pos = {n: (graph.nodes[n].get("time", 0.0), graph.nodes[n].get("level", n)) for n in graph.nodes}
-    sizes = [50 + 15 * graph.degree(n) for n in graph.nodes]
+    values = {n: float(graph.nodes[n].get("value", n)) for n in graph.nodes}
+    init = {n: (0.0, v) for n, v in values.items()}
+    pos = nx.spring_layout(graph, pos=init, fixed=None, seed=0, k=1.0 / max(1, len(graph) ** 0.5))
+    sizes = [50 + 25 * graph.degree(n) for n in graph.nodes]
     nx.draw_networkx_nodes(graph, pos, node_size=sizes, node_color="tab:blue", alpha=0.8, ax=ax)
     nx.draw_networkx_edges(graph, pos, alpha=0.3, ax=ax)
-    ax.set_xlabel("time (norm.)")
-    ax.set_ylabel("quantisation level (norm.)")
+    labels = {n: f"{values[n]:.2f}" for n in graph.nodes}
+    nx.draw_networkx_labels(graph, pos, labels=labels, font_size=8, ax=ax)
     ax.set_title(title)
+    ax.set_axis_off()
     return ax
 
 

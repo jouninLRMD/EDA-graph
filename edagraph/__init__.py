@@ -15,9 +15,18 @@ Public API
 """
 from .config import Config, CASE_CLASS_MAP, CASE_VIDEO_CLASSES
 from .preprocessing import preprocess_eda, segment_signal, label_window
-from .quantization import quantize_signal, graph_nodes_from_quantization
+from .quantization import (
+    quantize_signal,
+    node_values_from_quantization,
+    graph_nodes_from_quantization,
+)
 from .graph import build_eda_graph, knn_graph_from_points
-from .features import extract_graph_features, extract_traditional_features, GRAPH_FEATURE_NAMES
+from .features import (
+    FEATURE_LEVELS,
+    GRAPH_FEATURE_NAMES,
+    extract_graph_features,
+    extract_traditional_features,
+)
 from .pipeline import EDAGraphPipeline
 from .dataset import load_case_subject, iter_case_windows
 
@@ -29,11 +38,13 @@ __all__ = [
     "segment_signal",
     "label_window",
     "quantize_signal",
+    "node_values_from_quantization",
     "graph_nodes_from_quantization",
     "build_eda_graph",
     "knn_graph_from_points",
     "extract_graph_features",
     "extract_traditional_features",
+    "FEATURE_LEVELS",
     "GRAPH_FEATURE_NAMES",
     "EDAGraphPipeline",
     "load_case_subject",

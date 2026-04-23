@@ -1,9 +1,23 @@
-"""Graph-level, node-level and spectral features for an EDA-graph.
+"""Graph-level, node-level and edge-level features for an EDA-graph.
 
-The output of :func:`extract_graph_features` is a ``dict`` whose keys match
-1:1 the column order of the original ``EDA_graph_features.csv`` published
-with the paper. This allows dropping the new extractor in place of the
-legacy code without breaking downstream scripts.
+Implements Table II of the paper, which groups the 58 features as:
+
+* **Graph-level**: Total Triangle Number, Graph Energy, Transitivity,
+  Cliques Counts, Number of Cliques, Graph Is Chordal, Center,
+  Diameter, Radius, Periphery, Average Clustering, Weisfeiler-Lehman
+  Kernel, GS Std, LS Std, Avg Triangle Participation, GS/LS Mean /
+  Min / Max / Median / Skewness / Kurtosis Magnitude and Phase.
+* **Node-level**: Total Degree / Closeness / Betweenness / Eigenvector /
+  Load / Harmonic Centrality, Total PageRank, Total Hubs, Number of
+  Nodes, Maximum / Minimum / Median Degree, Closeness Centrality,
+  Eccentricity.
+* **Edge-level**: Total Flow Centrality, Total Log Flow Centrality,
+  Number of Edges, Assortativity, Spearman Correlation.
+
+The output of :func:`extract_graph_features` is a ``dict`` whose keys
+match 1:1 the column order of the original
+``EDA_graph_features.csv`` published with the paper. This lets the new
+extractor be a drop-in replacement for the legacy code.
 
 Optimisation notes
 ------------------
@@ -30,6 +44,73 @@ from scipy.stats import kurtosis, skew, spearmanr
 # ---------------------------------------------------------------------------
 # Canonical column order - must match EDA_graph_features.csv
 # ---------------------------------------------------------------------------
+# Mapping of each feature to its Table II level.
+FEATURE_LEVELS: Dict[str, str] = {
+    # Graph-level
+    "total_triangle_number": "graph",
+    "graph_energy": "graph",
+    "transitivity": "graph",
+    "graph_clique_num": "graph",
+    "graph_number_of_cliqs": "graph",
+    "P_is_chordal": "graph",
+    "P_center": "graph",
+    "P_diameter": "graph",
+    "P_radius": "graph",
+    "P_periphery": "graph",
+    "P_average_clustering": "graph",
+    "avg_clustering_coefficient": "graph",
+    "analyze_weisfeiler_lehman_kernel": "graph",
+    "graph_spectrum_std": "graph",
+    "laplacian_spectrum_std": "graph",
+    "avg_triangle_participation": "graph",
+    "graph_spectrum_mean_magnitude": "graph",
+    "graph_spectrum_min_magnitude": "graph",
+    "graph_spectrum_max_magnitude": "graph",
+    "graph_spectrum_median_magnitude": "graph",
+    "graph_spectrum_skewness_magnitude": "graph",
+    "graph_spectrum_kurtosis_magnitude": "graph",
+    "laplacian_spectrum_mean_magnitude": "graph",
+    "laplacian_spectrum_min_magnitude": "graph",
+    "laplacian_spectrum_max_magnitude": "graph",
+    "laplacian_spectrum_median_magnitude": "graph",
+    "laplacian_spectrum_skewness_magnitude": "graph",
+    "laplacian_spectrum_kurtosis_magnitude": "graph",
+    "graph_spectrum_mean_phase": "graph",
+    "graph_spectrum_min_phase": "graph",
+    "graph_spectrum_max_phase": "graph",
+    "graph_spectrum_median_phase": "graph",
+    "graph_spectrum_skewness_phase": "graph",
+    "graph_spectrum_kurtosis_phase": "graph",
+    "laplacian_spectrum_mean_phase": "graph",
+    "laplacian_spectrum_min_phase": "graph",
+    "laplacian_spectrum_max_phase": "graph",
+    "laplacian_spectrum_median_phase": "graph",
+    "laplacian_spectrum_skewness_phase": "graph",
+    "laplacian_spectrum_kurtosis_phase": "graph",
+    # Node-level
+    "total_degree_centrality": "node",
+    "total_closeness_centrality": "node",
+    "total_betweenness_centrality": "node",
+    "total_eigenvector_centrality": "node",
+    "total_load_centrality": "node",
+    "total_harmonic_centrality": "node",
+    "total_pagerank": "node",
+    "total_hubs": "node",
+    "number_of_nodes": "node",
+    "maximum_degree": "node",
+    "minimum_degree": "node",
+    "median_degree": "node",
+    "P_closeness_centrality": "node",
+    "eccentricity": "node",
+    # Edge-level
+    "total_flow_centrality": "edge",
+    "total_log_flow_centrality": "edge",
+    "number_of_edges": "edge",
+    "assortativity": "edge",
+    "spearmanr_correlation": "edge",
+}
+
+
 GRAPH_FEATURE_NAMES: List[str] = [
     "total_triangle_number",
     "total_degree_centrality",

@@ -12,7 +12,12 @@ from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import (
+    AdaBoostClassifier,
+    BaggingClassifier,
+    GradientBoostingClassifier,
+    RandomForestClassifier,
+)
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import (
     accuracy_score,
@@ -30,31 +35,65 @@ from sklearn.tree import DecisionTreeClassifier
 
 
 def _default_classifiers(random_state: int = 42) -> Dict[str, Tuple[Any, Dict[str, list]]]:
+    """Classifiers and hyper-parameter grids from Table IV of the paper."""
     return {
-        "nb": (GaussianNB(), {"clf__var_smoothing": [1e-9, 1e-7, 1e-5]}),
+        # Naive Bayes
+        "nb": (GaussianNB(), {"clf__var_smoothing": [1e-6, 1e-5, 1e-4]}),
+        # K-Nearest Neighbors
         "knn": (
             KNeighborsClassifier(),
-            {"clf__n_neighbors": [3, 5, 7], "clf__weights": ["uniform", "distance"]},
+            {
+                "clf__n_neighbors": [1, 2, 3, 4, 5],
+                "clf__weights": ["uniform", "distance"],
+                "clf__p": [1, 2],
+            },
         ),
+        # Random Forest
         "rf": (
             RandomForestClassifier(random_state=random_state, n_jobs=1),
-            {"clf__n_estimators": [100, 300], "clf__max_depth": [None, 20]},
+            {
+                "clf__n_estimators": [100, 200],
+                "clf__max_depth": [20, 30],
+                "clf__random_state": [42],
+            },
         ),
+        # AdaBoost
         "adaboost": (
             AdaBoostClassifier(random_state=random_state),
-            {"clf__n_estimators": [50, 100], "clf__learning_rate": [0.1, 0.5]},
+            {"clf__n_estimators": [50, 100, 150], "clf__learning_rate": [0.1, 0.5]},
         ),
+        # Gradient Boosting
         "gb": (
             GradientBoostingClassifier(random_state=random_state),
-            {"clf__n_estimators": [100, 200], "clf__max_depth": [3, 6]},
+            {
+                "clf__n_estimators": [50, 100],
+                "clf__learning_rate": [0.1, 1.0],
+                "clf__max_depth": [40, 60],
+            },
         ),
+        # Decision Tree
         "dt": (
             DecisionTreeClassifier(random_state=random_state),
-            {"clf__max_depth": [10, None], "clf__min_samples_split": [2, 10]},
+            {
+                "clf__max_depth": [10, 30],
+                "clf__min_samples_split": [2, 10],
+                "clf__random_state": [42],
+            },
         ),
+        # Support Vector Machine (RBF)
         "svm": (
             SVC(random_state=random_state),
-            {"clf__C": [1, 10], "clf__gamma": ["scale", 0.1], "clf__kernel": ["rbf"]},
+            {"clf__C": [1, 10, 100], "clf__gamma": [0.1, 1, 10], "clf__kernel": ["rbf"]},
+        ),
+        # Bagging Ensemble Classifier
+        "bagging": (
+            BaggingClassifier(random_state=random_state, n_jobs=1),
+            {
+                "clf__n_estimators": [50, 100, 500],
+                "clf__max_samples": [0.3, 0.5, 1.0],
+                "clf__max_features": [0.3, 0.5, 0.7, 1.0],
+                "clf__bootstrap": [True, False],
+            },
         ),
     }
 

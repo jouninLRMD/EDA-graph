@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="edagraph",
-    version="1.0.0",
+    version="1.1.0",
     description="EDA-Graph: Graph Signal Processing of Electrodermal Activity for Emotional States Detection.",
     long_description=Path("README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
@@ -19,10 +19,15 @@ setup(
         "networkx>=3.0",
         "joblib>=1.2",
         "PyYAML>=6.0",
+        "scikit-learn>=1.2",
+        "statsmodels>=0.14",
+        "scikit-posthocs>=0.8",
     ],
     entry_points={
         "console_scripts": [
             "edagraph-extract = scripts.extract_features:main",
+            "edagraph-stats = scripts.run_statistics:main",
+            "edagraph-classify = scripts.run_classification:main",
         ],
     },
     license="MIT",

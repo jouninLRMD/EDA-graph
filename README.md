@@ -11,15 +11,13 @@ Reference implementation of
 > [doi:10.1109/JBHI.2024.3405975](https://doi.org/10.1109/JBHI.2024.3405975)
 > - [IEEE Xplore](https://ieeexplore.ieee.org/document/10539177)
 
-This repository contains **only** the code needed to:
+This repository contains the code needed to:
 
 1. Build an EDA-graph from an electrodermal-activity signal
    (Section II-B and II-C of the paper).
 2. Extract the **58 graph / node / edge-level features** of Table II.
-
-It does **not** include classification, statistical-analysis or
-plotting utilities - those live outside this package and the
-published results in the paper are the reference.
+3. Run the **statistical analysis** (Section II-E) and
+   **Leave-One-Subject-Out classification** (Section II-F / Table IV).
 
 ![Step-by-step EDA-graph construction](Paper_Figures/Fig_2_step_by_step_graph.jpg)
 
@@ -36,10 +34,12 @@ pip install -e .
 
 ## 2. Run on a CASE-formatted dataset
 
-```bash
-python scripts/extract_features.py \
-    --data-root /path/to/CASE/interpolated \
-    --output EDA_graph_features.csv \
+### 2.1 Feature extraction
+
+```cmd
+python scripts\extract_features.py ^
+    --data-root "E:\OneDrive\Research\emotion_graph\Data\data\interpolated" ^
+    --output EDA_graph_features.csv ^
     --n-jobs -1
 ```
 
@@ -53,6 +53,36 @@ subject, <58 graph features>, valence, arousal, class
 where `<58 graph features>` is the list exported as
 `edagraph.features.GRAPH_FEATURE_NAMES` (see
 `edagraph/features/graph_features.py`).
+
+### 2.2 Statistical analysis (Section II-E)
+
+Anderson-Darling normality per class, Kruskal-Wallis H across classes,
+Dunn post-hoc with Holm-Bonferroni at `alpha = 0.005`:
+
+```cmd
+python scripts\run_statistics.py ^
+    --features EDA_graph_features.csv ^
+    --output-dir results\stats ^
+    --top-k 5
+```
+
+Outputs: `kruskal_wallis.csv`, `anderson_darling.csv` and one
+`dunn_<feature>.csv` per top-K feature.
+
+### 2.3 LOSO classification (Section II-F, Table IV)
+
+Eight classifiers (Naive Bayes, KNN, Random Forest, AdaBoost, Gradient
+Boosting, Decision Tree, SVM-RBF, Bagging Ensemble) with grid-search
+hyper-parameters matching Table IV, optional `SelectKBest`
+(ANOVA F-value, Section II-G):
+
+```cmd
+python scripts\run_classification.py ^
+    --features EDA_graph_features.csv ^
+    --k-best 5 ^
+    --output results\classification.csv ^
+    --n-jobs -1
+```
 
 ## 3. Use from Python
 
@@ -168,9 +198,13 @@ eda-graph/
 │   ├── features/
 │   │   └── graph_features.py     58 EDA-graph features (Table II)
 │   ├── dataset.py                CASE-format loader
-│   └── pipeline.py               Joblib-parallel batch extraction
+│   ├── pipeline.py               Joblib-parallel batch extraction
+│   ├── stats.py                  Anderson-Darling / Kruskal-Wallis / Dunn + Holm (Section II-E)
+│   └── experiments.py            LOSO classification (Section II-F, Table IV)
 ├── scripts/
-│   └── extract_features.py       CLI: folder -> features CSV
+│   ├── extract_features.py       CLI: folder -> features CSV
+│   ├── run_statistics.py         CLI: features CSV -> stat tables
+│   └── run_classification.py     CLI: features CSV -> LOSO summary
 ├── tests/test_pipeline.py        Smoke test on a synthetic signal
 ├── config.yaml                   Default Config serialised to YAML
 ├── requirements.txt / setup.py   Install recipe
